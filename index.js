@@ -7,7 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const Anthropic = require('@anthropic-ai/sdk');
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 const COLLECTION_FILE = path.join(__dirname, 'collection.json');
 
 const upload = multer({
