@@ -1,5 +1,7 @@
 require('dotenv').config();
+const crypto = require('crypto');
 const express = require('express');
+const cookieParser = require('cookie-parser');
 const multer = require('multer');
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
@@ -7,6 +9,12 @@ const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const APP_PIN = process.env.APP_PIN;
+const TOKEN_SECRET = process.env.TOKEN_SECRET || crypto.randomBytes(32).toString('hex');
+
+function makeToken() {
+  return crypto.createHmac('sha256', TOKEN_SECRET).update(APP_PIN).digest('hex');
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -15,6 +23,36 @@ const upload = multer({
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
+app.use(cookieParser());
+
+// POST /api/auth/verify — check PIN
+app.post('/api/auth/verify', (req, res) => {
+  if (!APP_PIN) return res.json({ success: true });
+
+  const { pin } = req.body;
+  if (pin === APP_PIN) {
+    res.cookie('token', makeToken(), {
+      httpOnly: true,
+      sameSite: 'strict',
+      maxAge: 90 * 24 * 60 * 60 * 1000,
+    });
+    return res.json({ success: true });
+  }
+  res.status(401).json({ error: 'Wrong PIN.' });
+});
+
+// GET /api/auth/check — check if already authenticated
+app.get('/api/auth/check', (req, res) => {
+  if (!APP_PIN) return res.json({ authenticated: true });
+  res.json({ authenticated: req.cookies.token === makeToken() });
+});
+
+// Protect all other /api routes
+app.use('/api', (req, res, next) => {
+  if (!APP_PIN) return next();
+  if (req.cookies.token === makeToken()) return next();
+  res.status(401).json({ error: 'Unauthorized' });
+});
 
 // GET /api/collection
 app.get('/api/collection', (req, res) => {

@@ -517,11 +517,76 @@
     showChooseScreen();
   }
 
+  /* ── PIN Screen ── */
+  function renderPinScreen() {
+    document.querySelector('.navbar').style.display = 'none';
+    document.querySelector('.footer').style.display = 'none';
+    main.innerHTML = `
+      <section class="hero" style="flex:1;display:flex;align-items:center;justify-content:center">
+        <div class="hero-inner">
+          <img src="/logo.svg" width="60" height="60" alt="" />
+          <h1 class="hero-headline" style="font-size:32px;margin-top:16px">GAMESHELF</h1>
+          <p class="hero-subtitle">Enter PIN to continue</p>
+          <form id="pinForm" style="display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:8px">
+            <input
+              id="pinInput"
+              class="form-input"
+              type="password"
+              inputmode="numeric"
+              placeholder="PIN"
+              autocomplete="off"
+              style="text-align:center;font-size:24px;letter-spacing:8px;max-width:200px"
+            />
+            <button type="submit" class="cta-button" style="margin-top:0">Enter</button>
+            <p class="error-message" id="pinError" style="display:none"></p>
+          </form>
+        </div>
+      </section>
+    `;
+    $('#pinInput').focus();
+    $('#pinForm').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const pin = $('#pinInput').value;
+      const errEl = $('#pinError');
+      errEl.style.display = 'none';
+      try {
+        const res = await fetch('/api/auth/verify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: pin }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Wrong PIN.');
+        document.querySelector('.navbar').style.display = '';
+        document.querySelector('.footer').style.display = '';
+        await loadCollection();
+        navigate();
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.style.display = '';
+        $('#pinInput').value = '';
+        $('#pinInput').focus();
+      }
+    });
+  }
+
   /* ── Service Worker Registration ── */
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/service-worker.js').catch(function () {});
   }
 
   /* ── Boot ── */
-  loadCollection().then(navigate);
+  async function boot() {
+    try {
+      const res = await fetch('/api/auth/check');
+      const data = await res.json();
+      if (!data.authenticated) {
+        renderPinScreen();
+        return;
+      }
+    } catch {}
+    await loadCollection();
+    navigate();
+  }
+  boot();
 })();
