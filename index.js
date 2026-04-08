@@ -1,14 +1,12 @@
 require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
-const fs = require('fs');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
 const Anthropic = require('@anthropic-ai/sdk');
+const db = require('./db');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const COLLECTION_FILE = path.join(__dirname, 'collection.json');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -18,22 +16,9 @@ const upload = multer({
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-function readCollection() {
-  if (!fs.existsSync(COLLECTION_FILE)) return [];
-  try {
-    return JSON.parse(fs.readFileSync(COLLECTION_FILE, 'utf8'));
-  } catch {
-    return [];
-  }
-}
-
-function writeCollection(collection) {
-  fs.writeFileSync(COLLECTION_FILE, JSON.stringify(collection, null, 2));
-}
-
 // GET /api/collection
 app.get('/api/collection', (req, res) => {
-  res.json(readCollection());
+  res.json(db.getCollection());
 });
 
 // POST /api/collection/identify — send photo, get game details back
@@ -98,40 +83,23 @@ app.post('/api/collection/add', (req, res) => {
   const { name, description, players, duration, difficulty, genre } = req.body;
   if (!name) return res.status(400).json({ error: 'Game name is required.' });
 
-  const collection = readCollection();
-  const game = {
-    id: uuidv4(),
-    name,
-    description,
-    players,
-    duration,
-    difficulty,
-    genre,
-    addedAt: new Date().toISOString(),
-  };
-  collection.push(game);
-  writeCollection(collection);
+  const game = db.addGame({ name, description, players, duration, difficulty, genre });
   res.status(201).json(game);
 });
 
 // DELETE /api/collection/:id
 app.delete('/api/collection/:id', (req, res) => {
-  const collection = readCollection();
-  const filtered = collection.filter(g => g.id !== req.params.id);
-  if (filtered.length === collection.length) {
-    return res.status(404).json({ error: 'Game not found.' });
-  }
-  writeCollection(filtered);
+  const deleted = db.removeGame(req.params.id);
+  if (!deleted) return res.status(404).json({ error: 'Game not found.' });
   res.json({ success: true });
 });
 
 // GET /api/random-game — picks from collection
 app.get('/api/random-game', (req, res) => {
-  const collection = readCollection();
-  if (collection.length === 0) {
+  const game = db.getRandomGame();
+  if (!game) {
     return res.status(404).json({ error: 'Your collection is empty. Add a game using the camera below.' });
   }
-  const game = collection[Math.floor(Math.random() * collection.length)];
   res.json(game);
 });
 
