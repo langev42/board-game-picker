@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="description" content="GameShelf — Your personal board game collection" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <title>GAMESHELF</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;600;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div id="app" class="app">
+
+      <!-- Navbar -->
+      <nav class="navbar">
+        <div class="nav-inner">
+          <a href="#/" class="brand">
+            <img src="/logo.svg" width="30" height="30" alt="" />
+            GAMESHELF
+          </a>
+          <div class="nav-links">
+            <a href="#/" class="nav-link" data-nav="home">Home</a>
+            <a href="#/collection" class="nav-link" data-nav="collection">Collection</a>
+          </div>
+        </div>
+      </nav>
+
+      <!-- Page content -->
+      <main id="main" style="flex:1;display:flex;flex-direction:column"></main>
+
+      <!-- Footer -->
+      <footer class="footer">
+        <div class="footer-inner">
+          <span class="footer-brand">
+            <img src="/logo.svg" width="24" height="24" alt="" />
+            GAMESHELF
+          </span>
+          <p class="footer-tagline">The fastest way to find your next game night adventure.</p>
+          <p class="footer-copy"></p>
+        </div>
+      </footer>
+
+    </div>
+
+    <!-- Hidden file input for camera -->
+    <input id="fileInput" type="file" accept="image/*" style="display:none" />
+
+    <script src="/app.js"></script>
+  </body>
+</html>
