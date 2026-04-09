@@ -10,10 +10,9 @@ const db = require('./db');
 const app = express();
 const PORT = process.env.PORT || 3001;
 const APP_PIN = process.env.APP_PIN;
-const TOKEN_SECRET = process.env.TOKEN_SECRET || crypto.randomBytes(32).toString('hex');
 
 function makeToken() {
-  return crypto.createHmac('sha256', TOKEN_SECRET).update(APP_PIN).digest('hex');
+  return crypto.createHash('sha256').update('gameshelf:' + APP_PIN).digest('hex');
 }
 
 const upload = multer({
