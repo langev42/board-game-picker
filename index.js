@@ -54,8 +54,8 @@ app.use('/api', (req, res, next) => {
 });
 
 // GET /api/collection
-app.get('/api/collection', (req, res) => {
-  res.json(db.getCollection());
+app.get('/api/collection', async (req, res) => {
+  res.json(await db.getCollection());
 });
 
 // POST /api/collection/identify — send photo, get game details back
@@ -116,24 +116,24 @@ If no board game is clearly visible, respond with: {"error":"brief explanation"}
 });
 
 // POST /api/collection/add
-app.post('/api/collection/add', (req, res) => {
+app.post('/api/collection/add', async (req, res) => {
   const { name, description, players, duration, difficulty, genre } = req.body;
   if (!name) return res.status(400).json({ error: 'Game name is required.' });
 
-  const game = db.addGame({ name, description, players, duration, difficulty, genre });
+  const game = await db.addGame({ name, description, players, duration, difficulty, genre });
   res.status(201).json(game);
 });
 
 // DELETE /api/collection/:id
-app.delete('/api/collection/:id', (req, res) => {
-  const deleted = db.removeGame(req.params.id);
+app.delete('/api/collection/:id', async (req, res) => {
+  const deleted = await db.removeGame(req.params.id);
   if (!deleted) return res.status(404).json({ error: 'Game not found.' });
   res.json({ success: true });
 });
 
 // GET /api/random-game — picks from collection
-app.get('/api/random-game', (req, res) => {
-  const game = db.getRandomGame();
+app.get('/api/random-game', async (req, res) => {
+  const game = await db.getRandomGame();
   if (!game) {
     return res.status(404).json({ error: 'Your collection is empty. Add a game using the camera below.' });
   }
@@ -145,6 +145,8 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => {
-  console.log(`GameShelf API running on http://localhost:${PORT}`);
+db.init().then(() => {
+  app.listen(PORT, () => {
+    console.log(`GameShelf API running on http://localhost:${PORT}`);
+  });
 });

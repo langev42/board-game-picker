@@ -1,43 +1,32 @@
-const Database = require('better-sqlite3');
-const path = require('path');
-const fs = require('fs');
+const { createClient } = require('@libsql/client');
 const { v4: uuidv4 } = require('uuid');
 
-const DATA_DIR = path.join(__dirname, 'data');
-if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
+const db = createClient({
+  url: process.env.TURSO_URL || 'file:data/gameshelf.db',
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
 
-const db = new Database(path.join(DATA_DIR, 'gameshelf.db'));
-db.pragma('journal_mode = WAL');
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS games (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    description TEXT,
-    players TEXT,
-    duration TEXT,
-    difficulty TEXT,
-    genre TEXT,
-    addedAt TEXT NOT NULL
-  )
-`);
-
-const stmts = {
-  getAll: db.prepare('SELECT * FROM games ORDER BY addedAt DESC'),
-  insert: db.prepare(`
-    INSERT INTO games (id, name, description, players, duration, difficulty, genre, addedAt)
-    VALUES (@id, @name, @description, @players, @duration, @difficulty, @genre, @addedAt)
-  `),
-  remove: db.prepare('DELETE FROM games WHERE id = ?'),
-  count: db.prepare('SELECT COUNT(*) as count FROM games'),
-  random: db.prepare('SELECT * FROM games ORDER BY RANDOM() LIMIT 1'),
-};
-
-function getCollection() {
-  return stmts.getAll.all();
+async function init() {
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS games (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      players TEXT,
+      duration TEXT,
+      difficulty TEXT,
+      genre TEXT,
+      addedAt TEXT NOT NULL
+    )
+  `);
 }
 
-function addGame({ name, description, players, duration, difficulty, genre }) {
+async function getCollection() {
+  const result = await db.execute('SELECT * FROM games ORDER BY addedAt DESC');
+  return result.rows;
+}
+
+async function addGame({ name, description, players, duration, difficulty, genre }) {
   const game = {
     id: uuidv4(),
     name,
@@ -48,21 +37,21 @@ function addGame({ name, description, players, duration, difficulty, genre }) {
     genre: genre || null,
     addedAt: new Date().toISOString(),
   };
-  stmts.insert.run(game);
+  await db.execute({
+    sql: 'INSERT INTO games (id, name, description, players, duration, difficulty, genre, addedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    args: [game.id, game.name, game.description, game.players, game.duration, game.difficulty, game.genre, game.addedAt],
+  });
   return game;
 }
 
-function removeGame(id) {
-  const result = stmts.remove.run(id);
-  return result.changes > 0;
+async function removeGame(id) {
+  const result = await db.execute({ sql: 'DELETE FROM games WHERE id = ?', args: [id] });
+  return result.rowsAffected > 0;
 }
 
-function getRandomGame() {
-  return stmts.random.get() || null;
+async function getRandomGame() {
+  const result = await db.execute('SELECT * FROM games ORDER BY RANDOM() LIMIT 1');
+  return result.rows[0] || null;
 }
 
-function getCount() {
-  return stmts.count.get().count;
-}
-
-module.exports = { getCollection, addGame, removeGame, getRandomGame, getCount };
+module.exports = { init, getCollection, addGame, removeGame, getRandomGame };
