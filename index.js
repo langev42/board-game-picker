@@ -1,7 +1,9 @@
 require('dotenv').config();
 const crypto = require('crypto');
 const express = require('express');
+const compression = require('compression');
 const cookieParser = require('cookie-parser');
+const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const path = require('path');
 const Anthropic = require('@anthropic-ai/sdk');
@@ -10,6 +12,8 @@ const db = require('./db');
 const app = express();
 const PORT = process.env.PORT || 3001;
 const APP_PIN = process.env.APP_PIN;
+
+const anthropic = new Anthropic();
 
 function makeToken() {
   return crypto.createHash('sha256').update('gameshelf:' + APP_PIN).digest('hex');
@@ -20,8 +24,17 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 },
 });
 
+const identifyLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many identify requests. Please wait a minute.' },
+});
+
+app.use(compression());
 app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
+app.use(express.json({ limit: '100kb' }));
 app.use(cookieParser());
 
 // POST /api/auth/verify — check PIN
@@ -59,7 +72,7 @@ app.get('/api/collection', async (req, res) => {
 });
 
 // POST /api/collection/identify — send photo, get game details back
-app.post('/api/collection/identify', upload.single('photo'), async (req, res) => {
+app.post('/api/collection/identify', identifyLimiter, upload.single('photo'), async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No image provided.' });
 
   const supportedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
@@ -70,11 +83,10 @@ app.post('/api/collection/identify', upload.single('photo'), async (req, res) =>
   }
 
   try {
-    const client = new Anthropic();
     const base64Image = req.file.buffer.toString('base64');
     const mediaType = req.file.mimetype;
 
-    const response = await client.messages.create({
+    const response = await anthropic.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 512,
       messages: [
@@ -115,10 +127,34 @@ If no board game is clearly visible, respond with: {"error":"brief explanation"}
   }
 });
 
+const LIMITS = {
+  name: 120,
+  description: 1000,
+  players: 40,
+  duration: 40,
+  difficulty: 20,
+  genre: 60,
+};
+
+function validateGameInput(body) {
+  for (const field of Object.keys(LIMITS)) {
+    const value = body[field];
+    if (value != null && typeof value !== 'string') {
+      return `${field} must be a string.`;
+    }
+    if (typeof value === 'string' && value.length > LIMITS[field]) {
+      return `${field} is too long (max ${LIMITS[field]} characters).`;
+    }
+  }
+  return null;
+}
+
 // POST /api/collection/add
 app.post('/api/collection/add', async (req, res) => {
   const { name, description, players, duration, difficulty, genre } = req.body;
-  if (!name) return res.status(400).json({ error: 'Game name is required.' });
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Game name is required.' });
+  const validationError = validateGameInput(req.body);
+  if (validationError) return res.status(400).json({ error: validationError });
 
   const game = await db.addGame({ name, description, players, duration, difficulty, genre });
   res.status(201).json(game);
@@ -131,13 +167,9 @@ app.delete('/api/collection/:id', async (req, res) => {
   res.json({ success: true });
 });
 
-// GET /api/random-game — picks from collection
-app.get('/api/random-game', async (req, res) => {
-  const game = await db.getRandomGame();
-  if (!game) {
-    return res.status(404).json({ error: 'Your collection is empty. Add a game using the camera below.' });
-  }
-  res.json(game);
+// 404 JSON for unmatched /api routes (before SPA fallback)
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'Not found' });
 });
 
 // SPA fallback — serve index.html for non-API routes

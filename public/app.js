@@ -10,7 +10,34 @@
   let confirmDeleteId = null;
 
   /* Filter state — selected chips per group. Empty set = no filter for that group. */
-  const filterState = {
+  const FILTER_STORAGE_KEY = 'gameshelf.filters';
+
+  function loadFilterState() {
+    try {
+      const raw = sessionStorage.getItem(FILTER_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return {
+        players: new Set(parsed.players || []),
+        difficulty: new Set(parsed.difficulty || []),
+        duration: new Set(parsed.duration || []),
+        genre: new Set(parsed.genre || []),
+      };
+    } catch { return null; }
+  }
+
+  function saveFilterState() {
+    try {
+      sessionStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify({
+        players: Array.from(filterState.players),
+        difficulty: Array.from(filterState.difficulty),
+        duration: Array.from(filterState.duration),
+        genre: Array.from(filterState.genre),
+      }));
+    } catch {}
+  }
+
+  const filterState = loadFilterState() || {
     players: new Set(),
     difficulty: new Set(),
     duration: new Set(),
@@ -240,6 +267,7 @@
         if (filterState[group].has(value)) filterState[group].delete(value);
         else filterState[group].add(value);
         chip.classList.toggle('active');
+        saveFilterState();
       });
     }
   }
@@ -470,19 +498,41 @@
 
         const spinnerDiv = document.createElement('div');
         spinnerDiv.className = 'identifying-state';
-        spinnerDiv.innerHTML = '<div class="identifying-spinner"></div><p>Identifying game...</p>';
+        spinnerDiv.innerHTML = '<div class="identifying-spinner"></div><p id="identifyMsg">Identifying game...</p>';
         modal.appendChild(spinnerDiv);
+
+        // After 10s, update the message to set expectations
+        const slowTimer = setTimeout(function () {
+          const msg = modal.querySelector('#identifyMsg');
+          if (msg) msg.textContent = 'Taking longer than usual — the server may be waking up...';
+        }, 10000);
+
+        // Abort after 60s
+        const controller = new AbortController();
+        const abortTimer = setTimeout(function () { controller.abort(); }, 60000);
 
         try {
           const compressed = await compressImage(file);
           const formData = new FormData();
           formData.append('photo', compressed, 'photo.jpg');
-          const res = await fetch('/api/collection/identify', { method: 'POST', body: formData });
+          const res = await fetch('/api/collection/identify', {
+            method: 'POST',
+            body: formData,
+            signal: controller.signal,
+          });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'Could not identify the game.');
+          clearTimeout(slowTimer);
+          clearTimeout(abortTimer);
           showPendingGame(data);
         } catch (err) {
+          clearTimeout(slowTimer);
+          clearTimeout(abortTimer);
           spinnerDiv.remove();
+          const message = err.name === 'AbortError'
+            ? 'Request timed out after 60 seconds. Please try again.'
+            : err.message;
+          err = new Error(message);
           const errDiv = document.createElement('div');
           errDiv.innerHTML = `
             <p class="identify-error">${escapeHTML(err.message)}</p>

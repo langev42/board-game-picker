@@ -49,9 +49,4 @@ async function removeGame(id) {
   return result.rowsAffected > 0;
 }
 
-async function getRandomGame() {
-  const result = await db.execute('SELECT * FROM games ORDER BY RANDOM() LIMIT 1');
-  return result.rows[0] || null;
-}
-
-module.exports = { init, getCollection, addGame, removeGame, getRandomGame };
+module.exports = { init, getCollection, addGame, removeGame };
