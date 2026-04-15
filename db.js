@@ -49,4 +49,12 @@ async function removeGame(id) {
   return result.rowsAffected > 0;
 }
 
-module.exports = { init, getCollection, addGame, removeGame };
+async function updateGame(id, { name, description, players, duration, difficulty, genre }) {
+  const result = await db.execute({
+    sql: 'UPDATE games SET name = ?, description = ?, players = ?, duration = ?, difficulty = ?, genre = ? WHERE id = ?',
+    args: [name, description || null, players || null, duration || null, difficulty || null, genre || null, id],
+  });
+  return result.rowsAffected > 0;
+}
+
+module.exports = { init, getCollection, addGame, removeGame, updateGame };

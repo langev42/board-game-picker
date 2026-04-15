@@ -244,6 +244,66 @@ body {
 .badge-genre { background-color: #000000; }
 
 /* ===========================
+   Filter toggle
+   =========================== */
+.filters-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background-color: transparent;
+  color: #555555;
+  font-family: 'Open Sans', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 18px;
+  border: 1.5px solid #dddddd;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+  letter-spacing: 0.5px;
+  margin-top: 4px;
+}
+
+.filters-toggle:hover {
+  border-color: #000000;
+  color: #000000;
+}
+
+.filters-toggle-caret {
+  font-size: 10px;
+  transition: transform 0.25s ease;
+}
+
+.filters-toggle.open .filters-toggle-caret {
+  transform: rotate(180deg);
+}
+
+.filters-count {
+  background-color: #0BBE68;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0;
+}
+
+.filters-wrap {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, margin 0.3s ease, opacity 0.2s ease;
+  width: 100%;
+  max-width: 640px;
+  opacity: 0;
+}
+
+.filters-wrap.open {
+  max-height: 800px;
+  opacity: 1;
+  margin-top: 4px;
+}
+
+/* ===========================
    Filter chips
    =========================== */
 .filters {
@@ -252,7 +312,7 @@ body {
   gap: 16px;
   max-width: 640px;
   width: 100%;
-  margin: 8px 0 4px;
+  padding: 4px 0 8px;
 }
 
 .filter-group {
@@ -557,6 +617,29 @@ body {
 .modal-close:hover {
   color: #000000;
   background-color: #f5f5f5;
+}
+
+.modal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.edit-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: #888888;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: color 0.2s ease, background-color 0.2s ease;
+  line-height: 1;
+}
+
+.edit-btn:hover {
+  color: #0BBE68;
+  background-color: #f0fdf6;
 }
 
 /* ===========================

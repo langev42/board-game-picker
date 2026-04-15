@@ -167,6 +167,18 @@ app.delete('/api/collection/:id', async (req, res) => {
   res.json({ success: true });
 });
 
+// PUT /api/collection/:id — edit a game
+app.put('/api/collection/:id', async (req, res) => {
+  const { name } = req.body;
+  if (!name || !name.trim()) return res.status(400).json({ error: 'Game name is required.' });
+  const validationError = validateGameInput(req.body);
+  if (validationError) return res.status(400).json({ error: validationError });
+
+  const updated = await db.updateGame(req.params.id, req.body);
+  if (!updated) return res.status(404).json({ error: 'Game not found.' });
+  res.json({ success: true });
+});
+
 // 404 JSON for unmatched /api routes (before SPA fallback)
 app.use('/api', (req, res) => {
   res.status(404).json({ error: 'Not found' });

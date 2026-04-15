@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gameshelf-v3';
+const CACHE_NAME = 'gameshelf-v4';
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',

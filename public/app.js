@@ -225,6 +225,11 @@
     `;
   }
 
+  function activeFilterCount() {
+    return filterState.players.size + filterState.difficulty.size
+      + filterState.duration.size + filterState.genre.size;
+  }
+
   function renderHome() {
     const count = collection.length;
     const subtitleContent = count === 0
@@ -232,12 +237,20 @@
       : `Picks from your collection of ${count} game${count !== 1 ? 's' : ''}.`;
 
     const genreOptions = uniqueGenres();
+    const activeCount = activeFilterCount();
     const filtersHTML = count === 0 ? '' : `
-      <div class="filters">
-        ${renderChipGroup('Players', 'players', PLAYER_OPTIONS)}
-        ${renderChipGroup('Difficulty', 'difficulty', DIFFICULTY_OPTIONS)}
-        ${renderChipGroup('Duration', 'duration', DURATION_OPTIONS)}
-        ${genreOptions.length ? renderChipGroup('Genre', 'genre', genreOptions) : ''}
+      <button type="button" class="filters-toggle" id="filtersToggle">
+        <span>Filters</span>
+        <span class="filters-count" id="filtersCount" style="${activeCount ? '' : 'display:none'}">${activeCount}</span>
+        <span class="filters-toggle-caret">\u25BE</span>
+      </button>
+      <div class="filters-wrap" id="filtersWrap">
+        <div class="filters">
+          ${renderChipGroup('Players', 'players', PLAYER_OPTIONS)}
+          ${renderChipGroup('Difficulty', 'difficulty', DIFFICULTY_OPTIONS)}
+          ${renderChipGroup('Duration', 'duration', DURATION_OPTIONS)}
+          ${genreOptions.length ? renderChipGroup('Genre', 'genre', genreOptions) : ''}
+        </div>
       </div>
     `;
 
@@ -257,6 +270,23 @@
 
     $('#pickBtn').addEventListener('click', pickRandomGame);
 
+    const toggleBtn = $('#filtersToggle');
+    const wrap = $('#filtersWrap');
+    if (toggleBtn && wrap) {
+      toggleBtn.addEventListener('click', function () {
+        toggleBtn.classList.toggle('open');
+        wrap.classList.toggle('open');
+      });
+    }
+
+    function updateCountBadge() {
+      const badge = $('#filtersCount');
+      if (!badge) return;
+      const n = activeFilterCount();
+      badge.textContent = n;
+      badge.style.display = n ? '' : 'none';
+    }
+
     const filtersEl = $('.filters');
     if (filtersEl) {
       filtersEl.addEventListener('click', function (e) {
@@ -268,6 +298,7 @@
         else filterState[group].add(value);
         chip.classList.toggle('active');
         saveFilterState();
+        updateCountBadge();
       });
     }
   }
@@ -406,34 +437,127 @@
   function openDetailModal(game) {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
-    overlay.innerHTML = `
-      <div class="modal">
-        <div class="modal-header">
-          <h2 class="modal-title">Game Details</h2>
-          <button class="modal-close">\u2715</button>
-        </div>
-        <h3 class="detail-modal-game-name">${escapeHTML(game.name)}</h3>
-        <div class="badges" style="margin-top:12px;margin-bottom:16px">${badgesHTML(game)}</div>
-        ${game.description ? `<p class="detail-game-description">${escapeHTML(game.description)}</p>` : ''}
-        <div class="modal-actions" style="margin-top:24px">
-          <button class="danger-button" id="modalRemoveBtn">Remove from Collection</button>
-          <button class="secondary-button modal-close-btn">Close</button>
-        </div>
-      </div>
-    `;
     document.body.appendChild(overlay);
 
     function close() { overlay.remove(); }
+
+    function renderDetailView(g) {
+      overlay.innerHTML = `
+        <div class="modal">
+          <div class="modal-header">
+            <div class="modal-title-row">
+              <h2 class="modal-title">Game Details</h2>
+              <button class="edit-btn" id="editBtn" title="Edit">\u270F\uFE0F</button>
+            </div>
+            <button class="modal-close">\u2715</button>
+          </div>
+          <h3 class="detail-modal-game-name">${escapeHTML(g.name)}</h3>
+          <div class="badges" style="margin-top:12px;margin-bottom:16px">${badgesHTML(g)}</div>
+          ${g.description ? `<p class="detail-game-description">${escapeHTML(g.description)}</p>` : ''}
+          <div class="modal-actions" style="margin-top:24px">
+            <button class="danger-button" id="modalRemoveBtn">Remove from Collection</button>
+          </div>
+        </div>
+      `;
+      overlay.querySelector('.modal-close').addEventListener('click', close);
+      overlay.querySelector('#editBtn').addEventListener('click', function () { renderEditView(g); });
+      overlay.querySelector('#modalRemoveBtn').addEventListener('click', async function () {
+        await removeGame(g.id);
+        close();
+      });
+    }
+
+    function renderEditView(g) {
+      overlay.innerHTML = `
+        <div class="modal">
+          <div class="modal-header">
+            <h2 class="modal-title">Edit Game</h2>
+            <button class="modal-close">\u2715</button>
+          </div>
+          <form id="editForm">
+            <div class="form-group">
+              <label class="form-label">Game Name *</label>
+              <input class="form-input" type="text" name="name" value="${escapeHTML(g.name || '')}" />
+              <p class="form-error" id="editError" style="display:none"></p>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Players</label>
+              <input class="form-input" type="text" name="players" value="${escapeHTML(g.players || '')}" placeholder="e.g. 2-4" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Duration</label>
+              <input class="form-input" type="text" name="duration" value="${escapeHTML(g.duration || '')}" placeholder="e.g. 60-90 min" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Difficulty</label>
+              <select class="form-select" name="difficulty">
+                <option value="Easy"${g.difficulty === 'Easy' ? ' selected' : ''}>Easy</option>
+                <option value="Medium"${g.difficulty === 'Medium' ? ' selected' : ''}>Medium</option>
+                <option value="Hard"${g.difficulty === 'Hard' ? ' selected' : ''}>Hard</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Genre</label>
+              <input class="form-input" type="text" name="genre" value="${escapeHTML(g.genre || '')}" placeholder="e.g. Strategy, Party" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">Description</label>
+              <textarea class="form-textarea" name="description" rows="3">${escapeHTML(g.description || '')}</textarea>
+            </div>
+            <div class="modal-actions">
+              <button type="submit" class="cta-button">Save Changes</button>
+              <button type="button" class="secondary-button" id="cancelEditBtn">Cancel</button>
+            </div>
+          </form>
+        </div>
+      `;
+      overlay.querySelector('.modal-close').addEventListener('click', close);
+      overlay.querySelector('#cancelEditBtn').addEventListener('click', function () { renderDetailView(g); });
+      overlay.querySelector('#editForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const name = (fd.get('name') || '').trim();
+        const errEl = overlay.querySelector('#editError');
+        if (!name) {
+          errEl.textContent = 'Game name is required.';
+          errEl.style.display = '';
+          return;
+        }
+        errEl.style.display = 'none';
+        const updated = {
+          name: name,
+          players: fd.get('players'),
+          duration: fd.get('duration'),
+          difficulty: fd.get('difficulty'),
+          genre: fd.get('genre'),
+          description: fd.get('description'),
+        };
+        try {
+          const res = await fetch('/api/collection/' + g.id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updated),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Could not save changes.');
+          // Update local state
+          Object.assign(g, updated);
+          const idx = collection.findIndex(function (x) { return x.id === g.id; });
+          if (idx >= 0) Object.assign(collection[idx], updated);
+          renderDetailView(g);
+        } catch (err) {
+          errEl.textContent = err.message;
+          errEl.style.display = '';
+        }
+      });
+    }
+
     overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
-    overlay.querySelector('.modal-close').addEventListener('click', close);
-    overlay.querySelector('.modal-close-btn').addEventListener('click', close);
-    overlay.querySelector('#modalRemoveBtn').addEventListener('click', async function () {
-      await removeGame(game.id);
-      close();
-    });
     document.addEventListener('keydown', function handler(e) {
       if (e.key === 'Escape') { close(); document.removeEventListener('keydown', handler); }
     });
+
+    renderDetailView(game);
   }
 
   /* ── Add Game Modal ── */
