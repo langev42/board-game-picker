@@ -224,10 +224,10 @@
       </div>
     `;
 
-    // Event delegation
+    // Event delegation on the collection inner container (not main, to avoid stacking)
     $('#addNewBtn').addEventListener('click', openAddModal);
 
-    main.addEventListener('click', function handler(e) {
+    $('.collection-inner').addEventListener('click', function (e) {
       const detailBtn = e.target.closest('[data-detail]');
       if (detailBtn) {
         const game = collection.find(function (g) { return g.id === detailBtn.dataset.detail; });
