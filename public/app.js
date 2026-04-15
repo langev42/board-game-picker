@@ -307,23 +307,28 @@
     const btn = $('#pickBtn');
     const errEl = $('#homeError');
     errEl.style.display = 'none';
-    btn.disabled = true;
-    btn.textContent = 'Picking...';
 
-    try {
-      const pool = filteredCollection();
-      if (!pool.length) {
-        throw new Error('No games match these filters.');
-      }
-      const game = pool[Math.floor(Math.random() * pool.length)];
-      renderGameCard(game);
-    } catch (err) {
-      errEl.textContent = err.message;
+    const pool = filteredCollection();
+    if (!pool.length) {
+      errEl.textContent = 'No games match these filters.';
       errEl.style.display = '';
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Pick a Game \u2192';
+      return;
     }
+
+    btn.disabled = true;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'dice-overlay';
+    overlay.innerHTML = '<div class="dice-rolling">\u{1F3B2}</div>';
+    document.body.appendChild(overlay);
+
+    await new Promise(function (resolve) { setTimeout(resolve, 2000); });
+
+    overlay.remove();
+    btn.disabled = false;
+
+    const game = pool[Math.floor(Math.random() * pool.length)];
+    renderGameCard(game);
   }
 
   function renderGameCard(game) {
