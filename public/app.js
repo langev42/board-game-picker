@@ -9,6 +9,18 @@
   let collection = [];
   let confirmDeleteId = null;
 
+  /* Filter state — selected chips per group. Empty set = no filter for that group. */
+  const filterState = {
+    players: new Set(),
+    difficulty: new Set(),
+    duration: new Set(),
+    genre: new Set(),
+  };
+
+  const PLAYER_OPTIONS = ['2', '3', '4', '5', '6+'];
+  const DIFFICULTY_OPTIONS = ['Easy', 'Medium', 'Hard'];
+  const DURATION_OPTIONS = ['< 30 min', '30-60 min', '60+ min'];
+
   /* ── Helpers ── */
   function difficultyColor(d) {
     if (d === 'Easy') return '#0BBE68';
@@ -33,13 +45,6 @@
   }
 
   /* ── API helpers ── */
-  async function apiGet(url) {
-    const res = await fetch(url);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Request failed');
-    return data;
-  }
-
   async function apiPost(url, body) {
     const res = await fetch(url, {
       method: 'POST',
@@ -63,6 +68,71 @@
       const data = await fetch('/api/collection').then(r => r.json());
       collection = Array.isArray(data) ? data : [];
     } catch { collection = []; }
+  }
+
+  /* ── Filter matchers ── */
+  function parseRange(str) {
+    if (!str) return null;
+    const nums = String(str).match(/\d+/g);
+    if (!nums || !nums.length) return null;
+    const min = parseInt(nums[0], 10);
+    const max = parseInt(nums[nums.length - 1], 10);
+    return { min: min, max: max };
+  }
+
+  function gameMatchesPlayers(game, selected) {
+    if (!selected.size) return true;
+    const range = parseRange(game.players);
+    if (!range) return false;
+    for (const opt of selected) {
+      if (opt === '6+') {
+        if (range.max >= 6) return true;
+      } else {
+        const n = parseInt(opt, 10);
+        if (n >= range.min && n <= range.max) return true;
+      }
+    }
+    return false;
+  }
+
+  function gameMatchesDifficulty(game, selected) {
+    if (!selected.size) return true;
+    return selected.has(game.difficulty);
+  }
+
+  function gameMatchesDuration(game, selected) {
+    if (!selected.size) return true;
+    const range = parseRange(game.duration);
+    if (!range) return false;
+    const midpoint = (range.min + range.max) / 2;
+    for (const opt of selected) {
+      if (opt === '< 30 min' && midpoint < 30) return true;
+      if (opt === '30-60 min' && midpoint >= 30 && midpoint < 60) return true;
+      if (opt === '60+ min' && midpoint >= 60) return true;
+    }
+    return false;
+  }
+
+  function gameMatchesGenre(game, selected) {
+    if (!selected.size) return true;
+    return selected.has(game.genre);
+  }
+
+  function filteredCollection() {
+    return collection.filter(function (g) {
+      return gameMatchesPlayers(g, filterState.players)
+        && gameMatchesDifficulty(g, filterState.difficulty)
+        && gameMatchesDuration(g, filterState.duration)
+        && gameMatchesGenre(g, filterState.genre);
+    });
+  }
+
+  function uniqueGenres() {
+    const set = new Set();
+    for (const g of collection) {
+      if (g.genre) set.add(g.genre);
+    }
+    return Array.from(set).sort();
   }
 
   /* ── Image compression ── */
@@ -115,11 +185,34 @@
   /* ══════════════════════════════
      HOME PAGE
      ══════════════════════════════ */
+  function renderChipGroup(label, group, options) {
+    const chips = options.map(function (opt) {
+      const active = filterState[group].has(opt) ? ' active' : '';
+      return `<button type="button" class="chip${active}" data-group="${group}" data-value="${escapeHTML(opt)}">${escapeHTML(opt)}</button>`;
+    }).join('');
+    return `
+      <div class="filter-group">
+        <span class="filter-label">${label}</span>
+        <div class="filter-chips">${chips}</div>
+      </div>
+    `;
+  }
+
   function renderHome() {
     const count = collection.length;
     const subtitleContent = count === 0
       ? 'Your collection is empty. <a href="#/collection" class="hero-link">Add some games</a> to get started.'
       : `Picks from your collection of ${count} game${count !== 1 ? 's' : ''}.`;
+
+    const genreOptions = uniqueGenres();
+    const filtersHTML = count === 0 ? '' : `
+      <div class="filters">
+        ${renderChipGroup('Players', 'players', PLAYER_OPTIONS)}
+        ${renderChipGroup('Difficulty', 'difficulty', DIFFICULTY_OPTIONS)}
+        ${renderChipGroup('Duration', 'duration', DURATION_OPTIONS)}
+        ${genreOptions.length ? renderChipGroup('Genre', 'genre', genreOptions) : ''}
+      </div>
+    `;
 
     main.innerHTML = `
       <section class="hero">
@@ -127,6 +220,7 @@
           <p class="hero-eyebrow">Your personal game night assistant</p>
           <h1 class="hero-headline">What Should We<br>Play Tonight?</h1>
           <p class="hero-subtitle">${subtitleContent}</p>
+          ${filtersHTML}
           <button class="cta-button" id="pickBtn" ${count === 0 ? 'disabled' : ''}>Pick a Game \u2192</button>
           <p class="error-message" id="homeError" style="display:none"></p>
         </div>
@@ -135,6 +229,19 @@
     `;
 
     $('#pickBtn').addEventListener('click', pickRandomGame);
+
+    const filtersEl = $('.filters');
+    if (filtersEl) {
+      filtersEl.addEventListener('click', function (e) {
+        const chip = e.target.closest('.chip');
+        if (!chip) return;
+        const group = chip.dataset.group;
+        const value = chip.dataset.value;
+        if (filterState[group].has(value)) filterState[group].delete(value);
+        else filterState[group].add(value);
+        chip.classList.toggle('active');
+      });
+    }
   }
 
   async function pickRandomGame() {
@@ -145,7 +252,11 @@
     btn.textContent = 'Picking...';
 
     try {
-      const game = await apiGet('/api/random-game');
+      const pool = filteredCollection();
+      if (!pool.length) {
+        throw new Error('No games match these filters.');
+      }
+      const game = pool[Math.floor(Math.random() * pool.length)];
       renderGameCard(game);
     } catch (err) {
       errEl.textContent = err.message;
