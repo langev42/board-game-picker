@@ -50,20 +50,17 @@
 
   /* ── Helpers ── */
   function difficultyColor(d) {
-    if (d === 'Easy') return '#7ba05b';   /* sage */
-    if (d === 'Medium') return '#d4a038'; /* amber */
-    if (d === 'Hard') return '#b13c3c';   /* crimson */
-    return '#7ba05b';
+    if (d === 'Easy') return '#0BBE68';
+    if (d === 'Medium') return '#f59e0b';
+    if (d === 'Hard') return '#ef4444';
+    return '#0BBE68';
   }
 
   function badgesHTML(game) {
     let h = '';
     if (game.players) h += `<span class="badge">\u{1F465} ${game.players} players</span>`;
     if (game.duration) h += `<span class="badge">\u23F1 ${game.duration}</span>`;
-    if (game.difficulty) {
-      const c = difficultyColor(game.difficulty);
-      h += `<span class="badge badge-difficulty" style="color:${c};border-color:${c}">${game.difficulty}</span>`;
-    }
+    if (game.difficulty) h += `<span class="badge badge-difficulty" style="background-color:${difficultyColor(game.difficulty)}">${game.difficulty}</span>`;
     if (game.genre) h += `<span class="badge badge-genre">\u{1F3B2} ${game.genre}</span>`;
     return h;
   }
